@@ -12,6 +12,8 @@
 (import (srfi 13))
 (import (srfi 1))
 
+;; True when either of PREDICATES is true
+;; Poor person’s union type
 (define (disjoin . predicates)
   (lambda (x)
     (let rec ((predicates predicates))
@@ -20,6 +22,8 @@
        (((car predicates) x) #t)
        (else                 (rec (cdr predicates)))))))
 
+;; True when every element in the provided list
+;; Satisfies at least one of the PREDICATES
 (define (list-of? . predicates)
   (lambda (x)
     (check-arg list? x 'list-of?)
@@ -30,8 +34,9 @@
        ((pred (car args)) (rec pred (cdr args)))
        (else              #f)))))
 
-(define-checked (read-file-lines (file-name string?))
-  (let ((in (open-input-file file-name)))
+;; Read all the lines in FILE, return a list of string
+(define-checked (read-file-lines (file string?))
+  (let ((in (open-input-file file)))
     (let lines ((acc (list))
                 (new-line (read-line in)))
       (if (eof-object? new-line)
@@ -42,7 +47,9 @@
           (lines (append acc (list new-line))
                  (read-line in))))))
 
-(define-checked (split-on-eq (str string?))
+;; Split the STR in two based on the SEPARATOR
+;; Used to split key-value pairs in .INI file
+(define-checked (split-on-separator (str string?) (separator char?))
   (let rec ((idx 0))
     (values-checked
      ((disjoin boolean?
@@ -50,11 +57,39 @@
      (cond
       ((= idx (string-length str))
        #f)
-      ((char=? #\= (string-ref str idx))
-       (list (string-copy str 0 idx)
-             (string-copy str (+ 1 idx))))
+      ((char=? separator (string-ref str idx))
+       (list (string-trim-right (string-copy str 0 idx) char-whitespace?)
+             (string-trim (string-copy str (+ 1 idx)) char-whitespace?)))
       (else (rec (+ 1 idx)))))))
 
-(define-checked (read-ini (file-name string?))
-  (filter identity
-          (map split-on-eq (read-file-lines file-name))))
+;; Alias for the parsed .INI structure—list of lists of strings
+(define ini? (list-of? (list-of? string?)))
+
+;; Parse the .INI FILE to a list of key-value pairs
+(define read-ini
+  (case-lambda-checked
+   (((file string?))
+    (read-ini file #\=))
+   (((file string?) (separator char?))
+    (values-checked (ini?)
+                    (filter identity
+                            (map (lambda (line)
+                                   (split-on-separator line separator))
+                                 (read-file-lines file)))))))
+
+;; Get a string value from INI residing under a string KEY
+(define-checked (get-val (ini ini?) (key string?))
+  (let ((found-pairs (filter (lambda (kv) (string=? key (car kv)))
+                             ini)))
+    (if (null? found-pairs)
+        #f
+        (cadar found-pairs))))
+
+;; Get a string value from INI residing under a string KEY
+;; Essentially a type-checked GET-VAL
+(define-checked (get-string-val (ini ini?) (key string?))
+  (values-checked (string?) (get-val ini key)))
+
+;; Get a number value from INI residing under a string KEY
+(define-checked (get-number-val (ini ini?) (key string?))
+  (values-checked (number?) (string->number (get-val ini key))))
