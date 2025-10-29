@@ -26,8 +26,6 @@
   (let ((in (open-input-file file-name)))
     (let lines ((acc (list))
                 (new-line (read-line in)))
-      (display new-line)
-      (newline)
       (if (eof-object? new-line)
           (values-checked ((list-of? string?))
                           (begin
