@@ -2,7 +2,15 @@
  (guile
   (import (ice-9 rdelim))
   (define-checked (read-line (port port?))
-    (car (%read-line port)))))
+    (car (%read-line port))))
+ (csi
+  (import (chicken io)))
+ (csc
+  (import (chicken io)))
+ (else))
+
+(import (srfi 13))
+(import (srfi 1))
 
 (define (disjoin . predicates)
   (lambda (x)
